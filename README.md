@@ -1,1 +1,4 @@
 # StmPong
+
+### Contributors
+Tharnath Bagirathan
