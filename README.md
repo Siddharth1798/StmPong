@@ -1,5 +1,5 @@
 # StmPong
 
 ### Contributors
-Tharnath Bagirathan
+Tharnath Bagirathan<br>
 Philip Gabriel Johnson
