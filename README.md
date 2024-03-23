@@ -2,5 +2,4 @@
 
 ### Contributors
 Tharnath Bagirathan<br>
-Philip Gabriel Johnson
-Siddharth Kaushal Manga
+Philip Gabriel Johnson                                                                                                               Siddharth Kaushal Manga
