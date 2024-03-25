@@ -1,4 +1,6 @@
 # StmPong
 
 ### Contributors
-Tharnath Bagirathan
+Tharnath Bagirathan<br>
+Philip Gabriel Johnson<br>
+Siddharth Kaushal Manga<br>
