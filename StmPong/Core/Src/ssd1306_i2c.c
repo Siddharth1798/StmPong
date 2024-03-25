@@ -104,12 +104,12 @@ int16_t ssd1306_I2C_Start(I2C_TypeDef* I2Cx, uint8_t address, uint8_t direction,
 void ssd1306_I2C_WriteData(I2C_TypeDef* I2Cx, uint8_t data) {
 	/* Wait till I2C is not busy anymore */
 	ssd1306_I2C_Timeout = ssd1306_I2C_TIMEOUT;
-	while (!(I2Cx->SR1 & I2C_SR1_TXE) && ssd1306_I2C_Timeout) {
+	while (!(I2Cx->ISR & I2C_ISR_TXE) && ssd1306_I2C_Timeout) {
 		ssd1306_I2C_Timeout--;
 	}
 
 	/* Send I2C data */
-	I2Cx->DR = data;
+	I2Cx->TXDR = data;
 }
 
 void ssd1306_I2C_Write(I2C_TypeDef* I2Cx, uint8_t address, uint8_t reg, uint8_t data) {
@@ -123,14 +123,14 @@ void ssd1306_I2C_Write(I2C_TypeDef* I2Cx, uint8_t address, uint8_t reg, uint8_t 
 uint8_t ssd1306_I2C_Stop(I2C_TypeDef* I2Cx) {
 	/* Wait till transmitter not empty */
 	ssd1306_I2C_Timeout = ssd1306_I2C_TIMEOUT;
-	while (((!(I2Cx->SR1 & I2C_SR1_TXE)) || (!(I2Cx->SR1 & I2C_SR1_BTF)))) {
+	while (((!(I2Cx->ISR & I2C_ISR_TXE)) || (!(I2Cx->ISR & I2C_ISR_TXIS)))) {
 		if (--ssd1306_I2C_Timeout == 0x00) {
 			return 1;
 		}
 	}
 	
 	/* Generate stop */
-	I2Cx->CR1 |= I2C_CR1_STOP;
+	I2C2->CR2 |= I2C_CR2_STOP;
 	
 	/* Return 0, everything ok */
 	return 0;
