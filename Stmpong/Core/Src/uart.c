@@ -19,17 +19,13 @@ void UART3_SendStr(char str[]){
 void USART3_4_IRQHandler(uint8_t data){
 	uint8_t rx_val = (uint8_t)(USART3->RDR); /* Receive data, clear flag */
 		if(data == NULL && rx_val >=65 && rx_val <= 122){
-			led = rx_val;
 			UART3_SendStr("\nCMD:: ");
-		}else if(rx_val >= 48 && rx_val <= 50){
-		  operation	= rx_val;
-			newdata = 1;
-		}	 
+		}
 }
 
 
-void USART1_IRQHandler(void){
-	char rx_val1[]; /* Receive data, clear flag */
+void USART1_IRQHandler(uint8_t size, char str[]){
+	char rx_val1[size]; /* Receive data, clear flag */
 	uint8_t send1 = 0;
 		while(rx_val1[send1] != '\0'){
 			if ((USART3->ISR & USART_ISR_TC) == USART_ISR_TC){
@@ -73,7 +69,9 @@ void usart_init(void)
     UART3_SendStr("A");
 
     uint8_t rx_val = (uint8_t)(USART3->RDR);
-    UART3_SendStr(rx_val1);
+		uint8_t rx_val1 = (uint8_t)(USART1->RDR);
+		uint8_t size = sizeof(rx_val1);
+    USART1_IRQHandler(rx_val1,size);
     /*while (1)
     {		
         //USART3->TDR = (1<<6);
