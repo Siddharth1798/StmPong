@@ -1,0 +1,25 @@
+--cpu Cortex-M0
+"stmpong\startup_stm32f072xb.o"
+"stmpong\main.o"
+"stmpong\stm32f0xx_it.o"
+"stmpong\stm32f0xx_hal_msp.o"
+"stmpong\stm32f0xx_hal_tim.o"
+"stmpong\stm32f0xx_hal_tim_ex.o"
+"stmpong\stm32f0xx_hal_rcc.o"
+"stmpong\stm32f0xx_hal_rcc_ex.o"
+"stmpong\stm32f0xx_hal.o"
+"stmpong\stm32f0xx_hal_i2c.o"
+"stmpong\stm32f0xx_hal_i2c_ex.o"
+"stmpong\stm32f0xx_hal_gpio.o"
+"stmpong\stm32f0xx_hal_dma.o"
+"stmpong\stm32f0xx_hal_cortex.o"
+"stmpong\stm32f0xx_hal_pwr.o"
+"stmpong\stm32f0xx_hal_pwr_ex.o"
+"stmpong\stm32f0xx_hal_flash.o"
+"stmpong\stm32f0xx_hal_flash_ex.o"
+"stmpong\stm32f0xx_hal_exti.o"
+"stmpong\system_stm32f0xx.o"
+--strict --scatter "Stmpong\Stmpong.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "Stmpong.map" -o Stmpong\Stmpong.axf
