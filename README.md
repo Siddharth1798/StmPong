@@ -51,7 +51,8 @@ A Simple Multiplayer Game Console to play Ping-Pong. The STM is connected to an 
 | USART3	       | It's used to communicate STM32 with PC
 | USART1         | It's used for communication between STM32 and ESP01
 | I2C         | It's used to interface STM32 with OLED
-
+| EXTI         |  Interrupts triggered on button clicks
+| Timers        | Timer is set at 30 HZ setting the refresh rate of the OLED to 30 fps and used to synchronise all the activities in the oled with the stm board
 
 ### 6 &nbsp; Milestones <br />
 |          | **Milestones Achieved**   
@@ -61,8 +62,18 @@ A Simple Multiplayer Game Console to play Ping-Pong. The STM is connected to an 
 | Milestone 3       | Creating the required ball motion in the oled display. Making the paddle move when the button is pressed accordingly. Creating a simple menu to connect to another device and start the game.
 | Milestone 4       | Completed the game in single-player mode.
 
-### 7 &nbsp; Challenges faced during implementation <br />
-- The OLED's refresh rate was 30 fps but the default firmware of ESP01 had a lower transmission rate which caused data loss hindering the establishment of WiFi Communication between two consoles.
+### 7 &nbsp; Implementation <br />
+The first step towards the implementation of the project was to interface all the external and internal peripherals associated with the project. 
+1. The first and hardest part of this phase was interfacing the SSD1306 OLED. We interfaced it using I2C but intially, there were lots of confusion on finding the right addresses since the hardware and datasheet contained different WHO_AM_I addresses. But eventually we figured that out and once we got the addresses right, it was all about writing the logics for the game.
+2. The next peripheral we interfaced was the ESP01. Interfacing the ESP module was straight-forward. We read/wrote data using UART. We designed a package which contained all the data to be transmitted (i.e.)position of the ball and paddle, synchronisation timer and all other data required for the game.
+3. The other peripherals we implemented were EXTI(triggered by button pushes), Timers(to synchronise ball and paddle movements to button pushes) and GPIOs(buttons and buzzer).
+4. To connect all the external peripherals with the STM32 Discovery board, we designed a PCB to house all the components with the board. Once the board was fabricated, we assembled and soldered all the components.<br />
+
+<p align="center">
+<img src="/PCB Files/Project.png" height="80%" width="80%"> </p>
+
+### 8 &nbsp; Challenges faced during implementation <br />
+- The OLED's refresh rate was 30 fps but the default firmware of ESP01 had a lower transmission rate which caused data loss, hindering the establishment of WiFi Communication between two consoles.
 - The OLED interfacing was challenging to implement.
 - The esp01 and oled combined were not able to draw sufficient current to work simultaneously.
 - The Buzzer didn't draw enough current from GPIO pins to trigger.
