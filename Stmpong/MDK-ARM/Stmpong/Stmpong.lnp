@@ -3,6 +3,8 @@
 "stmpong\main.o"
 "stmpong\stm32f0xx_it.o"
 "stmpong\stm32f0xx_hal_msp.o"
+"stmpong\ssd1309.o"
+"stmpong\fonts.o"
 "stmpong\stm32f0xx_hal_tim.o"
 "stmpong\stm32f0xx_hal_tim_ex.o"
 "stmpong\stm32f0xx_hal_rcc.o"

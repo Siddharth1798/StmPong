@@ -67,65 +67,126 @@ void initGyro(void);
 void senseGyro(void);
 void SystemClock_Config(void);
 void UART3_SendStr(char str[]);
-static uint8_t SSD1306_Buffer[128 * 32 / 8];
-
-
-void ssd1306_I2C_Write(uint8_t address, uint8_t reg, uint8_t data);
-void ssd1306_I2C_WriteMulti(uint8_t address, uint8_t reg, uint8_t* data, uint16_t count);
-
-void SSD1306_WRITECOMMAND(uint8_t command){
-	ssd1306_I2C_Write(display_addr, 0x00,  command);
+void initBuzzer(void);
+void initButtons(void);	
+void drawPaddle(void);
+void startSequence(void);
+int dir = -3;
+int A = 1103515245,C = 12345;
+long long int M = 2147483648;
+int generateRandom(int min, int max) {
+    static unsigned int seed = 0;
+    seed = (A * seed + C) % M;
+    return min + (seed % (max - min + 1));
 }
+int x = 63,y=32,x1=-1,y1=-1,Px=5,Py=32,Pheight=8, maxSpeed=2,point=3, gameStatus = -1, gameComplete = 0;
 
-void SSD1306_UpdateScreen(void) {
-	UART3_SendStr("Updating Display");
-	uint8_t m;
-	
-	for (m = 0; m < 8; m++) {
-		SSD1306_WRITECOMMAND(0xB0 + 1);
-		SSD1306_WRITECOMMAND(0x00);
-		SSD1306_WRITECOMMAND(0x10);
-		
-		/* Write multi data */
-		ssd1306_I2C_WriteMulti(display_addr, 0x40, &SSD1306_Buffer[128 * m], 128);
-		GPIOC->ODR ^= (1<<7);
-		HAL_Delay(200);
-	}
-}
-
-
-
-void SSD1306_Fill(uint8_t color) {
-	UART3_SendStr("Filling Display");
-	int c = 128 * 32 / 8;
-	for(int i=0;i<c;i++){
-		SSD1306_Buffer[i] = 0xFF;
-	}
-	//memset(SSD1306_Buffer, (color == 0) ? 0x00 : 0xFF, sizeof(SSD1306_Buffer));
-}
-
-
-
-void UART3_SendStr(char str[]){
-    uint8_t send = 0;
-		while(str[send] != '\0'){
-			if ((USART3->ISR & USART_ISR_TC) == USART_ISR_TC){
-				USART3->TDR = str[send++];
+int ifHitPaddle(int x, int y) {
+		if((x-3<=Px+2)&&(y<Py+8)&&(y>Py-8)&&(x1<0)){
+			GPIOC->ODR ^= (1<<7);
+			point++;
+			if(point>2){
+				maxSpeed=3;
 			}
+			if(point>9){
+				SSD1306_Fill(0);
+				SSD1306_GotoXY(40,27);
+				SSD1306_Puts("YOU WON", NULL, 1);   
+				gameComplete = 1;
+				gameStatus = 1;
+			}
+			return 1;
+	  }
+		if(((y>Py+6)||(y<Py-6))&&(x-3<=3)&&(x1<0)
+		){
+			point--;
+			if(point<1){
+				gameComplete = 1;
+				gameStatus = 0;
+			}
+			return 1;
 		}
-		USART3->TDR = '\n';
-	USART3->ICR |= USART_ICR_TCCF;
+		return 0;
 }
 
-void USART3_4_IRQHandler(void){
-	uint8_t rx_val = (uint8_t)(USART3->RDR); /* Receive data, clear flag */
-		if(led == NULL && rx_val >=65 && rx_val <= 122){
-			led = rx_val;
-			UART3_SendStr("\nCMD:: ");
-		}else if(rx_val >= 48 && rx_val <= 50){
-		  operation	= rx_val;
-			newdata = 1;
-		}	 
+void EXTI4_15_IRQHandler(void){
+	
+	GPIOC->ODR ^= (1<<6);
+	if (EXTI->PR & (1<<4)){
+		//Erase The Current Paddle
+		SSD1306_DrawLine(Px-1,Py-Pheight,Px-1,Py+Pheight,0);
+		SSD1306_DrawLine(Px,Py-Pheight,Px,Py+Pheight,0);
+		//Decrement The Paddle Position
+		Py=Py-8;
+		if((Py-8)<=0){
+			Py=8;
+		}
+		//Draw New Paddle
+		SSD1306_DrawLine(Px-1,Py-Pheight,Px-1,Py+Pheight,1);
+		SSD1306_DrawLine(Px,Py-Pheight,Px,Py+Pheight,1);
+		EXTI->PR |= (1<<4);		// Clearing the pending register
+	}
+	if (EXTI->PR & (1<<5)){
+		//Erase The Current Paddle
+		SSD1306_DrawLine(Px-1,Py-Pheight,Px-1,Py+Pheight,0);
+		SSD1306_DrawLine(Px,Py-Pheight,Px,Py+Pheight,0);
+		//Increment The Paddle Position
+		Py=Py+8;
+		if((Py+8)>=64){
+			Py=56;
+		}
+		//Draw New Paddle
+		SSD1306_DrawLine(Px-1,Py-Pheight,Px-1,Py+Pheight,1);
+		SSD1306_DrawLine(Px,Py-Pheight,Px,Py+Pheight,1);
+		EXTI->PR |= (1<<5);   // Clearing the pending register
+	}
+}
+
+void EXTI0_1_IRQHandler(void){
+	if (EXTI->PR & (1<<0)){
+		//Erase The Current Paddle
+		SSD1306_DrawLine(Px-1,Py-Pheight,Px-1,Py+Pheight,0);
+		SSD1306_DrawLine(Px,Py-Pheight,Px,Py+Pheight,0);
+		//Increment The Paddle Position
+		Py=Py+8;
+		if((Py+8)>=64){
+			Py=56;
+		}
+		//Draw New Paddle
+		SSD1306_DrawLine(Px-1,Py-Pheight,Px-1,Py+Pheight,1);
+		SSD1306_DrawLine(Px,Py-Pheight,Px,Py+Pheight,1);
+		EXTI->PR |= (1<<0);   // Clearing the pending register
+	}
+}
+
+volatile uint8_t isUpdate = 0; 
+
+void TIM2_IRQHandler(void){
+	GPIOC->ODR ^= (1 << 8)|(1 << 9);		//Timer 2 HeartBeat
+	SSD1306_DrawCircle(x-x1,y-y1,2,0);	//Erase The Previous Ball
+	SSD1306_DrawCircle(x,y,2,1);				//Draw New Ball
+	drawPaddle();												//Draw Paddle
+	//Change The Bounce Angle And Speed Randomly
+	if(y>=64-3){												
+		y1=-generateRandom(2,maxSpeed);
+	}else if(y<=4){
+		y1=generateRandom(2,maxSpeed);
+	}
+	y=y+y1;
+	if(x>=128-5){
+		x1=-generateRandom(2,maxSpeed);
+	}else if((x<=3) || ifHitPaddle(x,y)){
+		x1=generateRandom(2,maxSpeed);
+	}
+	x=x+x1; 
+	
+	//Print The Score
+	SSD1306_GotoXY(59,50);
+	SSD1306_Putc('0'+point,NULL,1);
+	if(!gameComplete){
+		isUpdate = 1;
+	}
+	TIM2->SR &= ~(1<<0);		//Clear The Interrupt Status Register Bit
 }
 
 
@@ -138,360 +199,95 @@ int main(void)
   HAL_Init();
   SystemClock_Config();
 	
-	RCC->APB1ENR |= RCC_APB1ENR_I2C2EN | RCC_APB1ENR_USART3EN;
-  RCC->AHBENR |= (RCC_AHBENR_GPIOCEN | RCC_AHBENR_GPIOBEN);
+	RCC->APB1ENR |= RCC_APB1ENR_I2C2EN | RCC_APB1ENR_USART3EN | RCC_APB1ENR_TIM2EN;		//Enable APB1ENR Periphs
+  RCC->AHBENR |= RCC_AHBENR_GPIOCEN | RCC_AHBENR_GPIOBEN | RCC_AHBENR_GPIOAEN;			//Enable APBENR Periphs
 	
+	//Enable Timer 2 Interrupt At 30Hz
+	TIM2->PSC = 2666;		//Set PreScaler to 2666
+	TIM2->ARR = 100;		//Set ARR to 100
 	
-	USART3->BRR |= 69;
+	TIM2->DIER |= (1 << 0); 
+	
+	NVIC_SetPriority(TIM2_IRQn, 1);		//Set Priority Of The Timer 2 to 1
+	TIM2->EGR |= (1<<0);
+	TIM2->CR1 |= (1<<0);
+	
+	//Set Up USART3 For Debugging 
+	USART3->BRR |= 69;	//Set Baud Rate To 115200
 	USART3->CR1 |= ( USART_CR1_TE | USART_CR1_UE);
 	USART3->CR1 |= USART_CR1_RXNEIE | USART_CR1_RE;
 	
-	NVIC_EnableIRQ(USART3_4_IRQn);
-	NVIC_SetPriority(USART3_4_IRQn,1);
+	NVIC_EnableIRQ(USART3_4_IRQn);			//Enable USART3 Interrupt
+	NVIC_SetPriority(USART3_4_IRQn,1);	//Set Priority Of The USART to 1
 
   GPIOC->MODER |= ((1<<9)|(1<<11));
 	GPIOC->AFR[0] |= ((1<<16)|(1<<20));
+			
+	initLEDs();				//Init LEDs For Debugging
+	initButtons();		//Init Buttons With Interrupt
+	ssd1306_Init_Display();		//Init Oled Display
 	
-		
-	UART3_SendStr("hELLO\n");
-	
-	// initialize LEDs
-	initLEDs();
-	// initialize I2C2
-	ssd1306_I2C_Init();
-	//initI2C2();	
-	
-	initDisplay();
-	
+	startSequence();		//Display Start Sequence
+	NVIC_EnableIRQ( TIM2_IRQn );			//Enable Timer 2 Interrupt
+
+	drawPaddle();							//Draw Paddle
+	SSD1306_UpdateScreen();		//Update Screen
+	GPIOC->ODR |= (1<<2);			
   while (1)
   {
+		if(isUpdate==1 && gameComplete==0){
+			SSD1306_UpdateScreen();		//Updating Screen Every 30Hz
+			isUpdate = 0;
+		}else if(gameComplete == 1){
+			NVIC_DisableIRQ( TIM2_IRQn );
+			SSD1306_Fill(0);
+			//Print Game Status
+			if(gameStatus == 1){
+				SSD1306_GotoXY(40,27);
+				SSD1306_Puts("YOU WON", NULL, 1);
+			}else{
+				SSD1306_GotoXY(33,27);
+				SSD1306_Puts("GAME OVER", NULL, 1);
+			}
+			SSD1306_UpdateScreen();				//Update Screen
+			gameComplete = 0;
+		}
   }
 }
 
+/* Start Sequence For Game */
+void startSequence(void){
+		SSD1306_GotoXY(61,28);
+		SSD1306_Puts("3", NULL, 1);
+		SSD1306_UpdateScreen();
+		SSD1306_Fill(0);
+		HAL_Delay(1000);
+		SSD1306_GotoXY(61,28);
+		SSD1306_Puts("2", NULL, 1);
+		SSD1306_UpdateScreen();
+		SSD1306_Fill(0);
+		HAL_Delay(1000);
+		SSD1306_GotoXY(61,28);
+		SSD1306_Puts("1", NULL, 1);
+		SSD1306_UpdateScreen();
+		SSD1306_Fill(0);
+		HAL_Delay(1000);
+		SSD1306_GotoXY(46,28);
+		SSD1306_Puts("START", NULL, 1);
+		SSD1306_UpdateScreen();
+		SSD1306_Fill(0);
+		HAL_Delay(1000);
+}
 
-
-
-
-
-
-void transmitCmdToI2C2(uint8_t slvAddr , uint8_t reg , uint8_t data){
-	// Clear the NBYTES and SADD bit fields
-	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
-	
-	I2C2->CR2 |= (slvAddr << I2C_CR2_SADD_Pos);   	// Set the L3GD20 slave address = slvAddr
-	I2C2->CR2 |= (0x2  << I2C_CR2_NBYTES_Pos); // Set the number of bytes to transmit = noOfBits
-	I2C2->CR2 &= ~(I2C_CR2_RD_WRN_Msk);        			// Set the RD_WRN to write operation
-	I2C2->CR2 |= (I2C_CR2_START_Msk);          			// Set START bit
-	
-	
-	
-	// Wait until TXIS or NACKF flags are set
-	while(1) {
-		// Continue if TXIS flag is set
-		if (I2C2->ISR & I2C_ISR_TXIS) {
-			I2C2->TXDR = reg;
-			break;
-		}
-		// Light ORANGE LED if NACKF flag is set (slave didn't respond)
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-		}
-	}
-	
-	
-	// Wait again until TXIS or NACKF flags are set (2)
-	while(1) {
-		// Continue if TXIS flag is set
-		if (I2C2->ISR & I2C_ISR_TXIS) {
-			I2C2->TXDR = data;
-			break;
-		}
-		// Light ORANGE LED if NACKF flag is set (slave didn't respond)
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-		}
-	}
-	
-	// Wait for TC flag is set
-	/*while(1) {
-		if (I2C2->ISR & I2C_ISR_TC) {
-			break;
-		}	
-	}*/
+//Method To Draw Paddle 
+void drawPaddle(void){
+	SSD1306_DrawLine(Px-1,Py-Pheight,Px-1,Py+Pheight,1);
+	SSD1306_DrawLine(Px,Py-Pheight,Px,Py+Pheight,1);
 }
 
 
 
-
-
-
-
-
-
-
-void initDisplay(void){
-	UART3_SendStr("Initializing Display");
-	SSD1306_WRITECOMMAND(0xAE); //display off
-	SSD1306_WRITECOMMAND(0x20); //Set Memory Addressing Mode   
-	SSD1306_WRITECOMMAND(0x10); //00,Horizontal Addressing Mode;01,Vertical Addressing Mode;10,Page Addressing Mode (RESET);11,Invalid
-	SSD1306_WRITECOMMAND(0xB0); //Set Page Start Address for Page Addressing Mode,0-7
-	SSD1306_WRITECOMMAND(0xC8); //Set COM Output Scan Direction
-	SSD1306_WRITECOMMAND(0x00); //---set low column address
-	SSD1306_WRITECOMMAND(0x10); //---set high column address
-	SSD1306_WRITECOMMAND(0x40); //--set start line address
-	SSD1306_WRITECOMMAND(0x81); //--set contrast control register
-	SSD1306_WRITECOMMAND(0xFF);
-	SSD1306_WRITECOMMAND(0xA1); //--set segment re-map 0 to 127
-	SSD1306_WRITECOMMAND(0xA6); //--set normal display
-	SSD1306_WRITECOMMAND(0xA8); //--set multiplex ratio(1 to 64)
-	SSD1306_WRITECOMMAND(0x3F); //
-	SSD1306_WRITECOMMAND(0xA4); //0xa4,Output follows RAM content;0xa5,Output ignores RAM content
-	SSD1306_WRITECOMMAND(0xD3); //-set display offset
-	SSD1306_WRITECOMMAND(0x00); //-not offset
-	SSD1306_WRITECOMMAND(0xD5); //--set display clock divide ratio/oscillator frequency
-	SSD1306_WRITECOMMAND(0xF0); //--set divide ratio
-	SSD1306_WRITECOMMAND(0xD9); //--set pre-charge period
-	SSD1306_WRITECOMMAND(0x22); //
-	SSD1306_WRITECOMMAND(0xDA); //--set com pins hardware configuration
-	SSD1306_WRITECOMMAND(0x12);
-	SSD1306_WRITECOMMAND(0xDB); //--set vcomh
-	SSD1306_WRITECOMMAND(0x20); //0x20,0.77xVcc
-	SSD1306_WRITECOMMAND(0x8D); //--set DC-DC enable
-	SSD1306_WRITECOMMAND(0x14); //
-	//SSD1306_WRITECOMMAND(0xA5); //
-	SSD1306_WRITECOMMAND(0xAF); //--turn on SSD1306 panel
-	
-	HAL_Delay(3000);
-	SSD1306_WRITECOMMAND(0xA7);
-	
-	//SSD1306_Fill(1);
-	//SSD1306_UpdateScreen();
-	
-}
-
-
-
-/*void ssd1306_I2C_WriteMulti(uint8_t address, uint8_t reg, uint8_t* data, uint16_t count) {
-	uint8_t i;
-	transmitToI2C2(address, 0x1, reg);
-	for (i = 0; i < count; i++) {
-		transmitToI2C2(address, 0x1, data[i]);
-		//USART3->TDR = data[i];
-	}
-	USART3->TDR = data[i];
-	USART3->TDR = 0xFF;
-}*/
-
-
-
-
-void ssd1306_I2C_WriteMulti(uint8_t address, uint8_t reg, uint8_t* data, uint16_t count) {
-	// Clear the NBYTES and SADD bit fields
-	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
-	
-	I2C2->CR2 |= (address << I2C_CR2_SADD_Pos);   	// Set the L3GD20 slave address = slvAddr
-	I2C2->CR2 |= (count  << I2C_CR2_NBYTES_Pos); // Set the number of bytes to transmit = noOfBits
-	I2C2->CR2 &= ~(I2C_CR2_RD_WRN_Msk);        			// Set the RD_WRN to write operation
-	I2C2->CR2 |= (I2C_CR2_START_Msk);          			// Set START bit
-	
-	
-	// Wait until TXIS or NACKF flags are set
-	while(1) {
-		// Continue if TXIS flag is set
-		if (I2C2->ISR & I2C_ISR_TXIS) {
-			I2C2->TXDR = reg;
-			break;
-		}
-		// Light ORANGE LED if NACKF flag is set (slave didn't respond)
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-		}
-	}
-	
-	GPIOC->ODR ^= (1<<7);
-	for(int j=0;j<count-5;j++){
-		// Wait again until TXIS or NACKF flags are set (2)
-		while(1) {
-			// Continue if TXIS flag is set
-			if (I2C2->ISR & I2C_ISR_TXIS) {
-				I2C2->TXDR = data[j];
-				break;
-			}
-			// Light ORANGE LED if NACKF flag is set (slave didn't respond)
-			if (I2C2->ISR & I2C_ISR_NACKF) {
-				
-			}
-		}
-		GPIOC->ODR ^= (1<<9);
-		HAL_Delay(100);
-	}
-	GPIOC->ODR ^= (1<<6);
-	// Wait for TC flag is set
-	/*while(1) {
-		if (I2C2->ISR & I2C_ISR_TC) {
-			GPIOC->ODR |= (1<<7);
-			HAL_Delay(200);
-			break;
-		}	
-	}*/
-	
-}
-
-
-
-
-
-void ssd1306_I2C_Write(uint8_t address, uint8_t reg, uint8_t data) {
-	// Clear the NBYTES and SADD bit fields
-	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
-	
-	I2C2->CR2 |= (address << I2C_CR2_SADD_Pos);   	// Set the L3GD20 slave address = slvAddr
-	I2C2->CR2 |= (0x2  << I2C_CR2_NBYTES_Pos); // Set the number of bytes to transmit = noOfBits
-	I2C2->CR2 &= ~(I2C_CR2_RD_WRN_Msk);        			// Set the RD_WRN to write operation
-	I2C2->CR2 |= (I2C_CR2_START_Msk);          			// Set START bit
-	
-	
-	
-	// Wait until TXIS or NACKF flags are set
-	while(1) {
-		// Continue if TXIS flag is set
-		if (I2C2->ISR & I2C_ISR_TXIS) {
-			I2C2->TXDR = reg;
-			break;
-		}
-		// Light ORANGE LED if NACKF flag is set (slave didn't respond)
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-		}
-	}
-	
-	
-	// Wait again until TXIS or NACKF flags are set (2)
-	while(1) {
-		// Continue if TXIS flag is set
-		if (I2C2->ISR & I2C_ISR_TXIS) {
-			I2C2->TXDR = data;
-			break;
-		}
-		// Light ORANGE LED if NACKF flag is set (slave didn't respond)
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-		}
-	}
-	
-	// Wait for TC flag is set
-	/*while(1) {
-		if (I2C2->ISR & I2C_ISR_TC) {
-			break;
-		}	
-	}*/
-}
-
-
-uint8_t receiveFromI2C2(uint8_t slvAddr, uint8_t noOfBits){
-		
-	// Clear the NBYTES and SADD bit fields
-	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
-	
-	I2C2->CR2 |= (slvAddr << I2C_CR2_SADD_Pos);   	// Set the L3GD20 slave address = slvAddr
-	I2C2->CR2 |= (noOfBits  << I2C_CR2_NBYTES_Pos); // Set the number of bytes to transmit = noOfBits
-	I2C2->CR2 |= (I2C_CR2_RD_WRN_Msk);         			// Set the RD_WRN to read operation
-	I2C2->CR2 |= (I2C_CR2_START_Msk);          			// Set START bit
-	
-	// Wait until RXNE or NACKF flags are set
-	while(1) {
-		// Continue if RXNE flag is set
-		if ((I2C2->ISR & I2C_ISR_RXNE)) {
-			break;
-		}
-		
-		// Light ORANGE LED if NACKF flag is set (slave didn't respond)
-		if ((I2C2->ISR & I2C_ISR_NACKF)) {
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
-			continue;
-		}
-	}
-	// Wait for TC flag is set
-	/*while(1) {
-		if (I2C2->ISR & I2C_ISR_TC) {
-			break;
-		}		
-	}*/
-	  
-	return I2C2->RXDR;;
-}
-
-
-void transmitToI2C2(uint8_t slvAddr, uint8_t noOfBits, uint8_t txdrData){
-	// Clear the NBYTES and SADD bit fields
-	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
-	
-	I2C2->CR2 |= (slvAddr << I2C_CR2_SADD_Pos);   	// Set the L3GD20 slave address = slvAddr
-	I2C2->CR2 |= (noOfBits  << I2C_CR2_NBYTES_Pos); // Set the number of bytes to transmit = noOfBits
-	I2C2->CR2 &= ~(I2C_CR2_RD_WRN_Msk);        			// Set the RD_WRN to write operation
-	I2C2->CR2 |= (I2C_CR2_START_Msk);          			// Set START bit
-
-	// Wait until TXIS or NACKF flags are set
-	while(1) {
-		// Continue if TXIS flag is set
-		if ((I2C2->ISR & I2C_ISR_TXIS)) {
-			I2C2->TXDR = txdrData; // Set I2C2->TXDR = txdrData
-			//UART3_SendStr("DATA SENT");
-			break;
-		}
-		
-		// Light ORANGE LED if NACKF flag is set (slave didn't respond)
-		if ((I2C2->ISR & I2C_ISR_NACKF)) {
-			//UART3_SendStr("NACKF");
-			continue;
-		}
-	}
-	
-	// Wait for TC flag is set
-	/*while(1) {
-		if (I2C2->ISR & I2C_ISR_TC) {
-			UART3_SendStr("TCFLAG");
-			break;
-		}
-	}*/
-	
-}
-
-
-/* Initialize all configured peripherals */
-void initI2C2(void) {
-	
-	// Set PB11 - AF1
-	GPIOB->MODER |= (GPIO_MODER_MODER11_1);          
-	GPIOB->OTYPER |= (GPIO_OTYPER_OT_11);            
-	GPIOB->AFR[1] |= (0x1 << GPIO_AFRH_AFSEL11_Pos); 
-	
-	// Set PB13 - AF5
-	GPIOB->MODER |= (GPIO_MODER_MODER13_1);          
-	GPIOB->OTYPER |= (GPIO_OTYPER_OT_13);            
-	GPIOB->AFR[1] |= (0x5 << GPIO_AFRH_AFSEL13_Pos); 
-	
-	// Set PB14 - initialize high
-	GPIOB->MODER |= (GPIO_MODER_MODER14_0);              
-	GPIOB->OTYPER &= ~(GPIO_OTYPER_OT_14);  
-	GPIOB->ODR |= (1<<14);	
-
-	// Set PC0 - initialize high
-	GPIOC->MODER |= (GPIO_MODER_MODER0_0);              
-	GPIOC->OTYPER &= ~(GPIO_OTYPER_OT_0);               
-	GPIOC->ODR |= (1<<0);
-
-	
-	I2C2->TIMINGR |= (0x0  << I2C_TIMINGR_PRESC_Pos);  
-	I2C2->TIMINGR |= (0x09 << I2C_TIMINGR_SCLL_Pos);   
-	I2C2->TIMINGR |= (0x03 << I2C_TIMINGR_SCLH_Pos);   
-	I2C2->TIMINGR |= (0x01  << I2C_TIMINGR_SDADEL_Pos); 
-	I2C2->TIMINGR |= (0x03  << I2C_TIMINGR_SCLDEL_Pos); 
-	
-	
-	I2C2->CR1 |= I2C_CR1_PE; 
-	
-	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
-}
-
-
-
-/* Initialize the LEDs*/
+/* Initialize The LEDs*/
 void initLEDs(void) {	
 	
 	GPIOC->MODER |= ((1 << 12)|(1 << 14) | (1 << 16) | (1 << 18));
@@ -507,27 +303,90 @@ void initLEDs(void) {
 
 }
 
+/*Inialize The Buttons*/
+void initButtons(void){
+	
+	// Setting up rising edge interrupt for PA4
+	GPIOA->MODER &= ~((1 << 8) & (1 << 9)); // Setting PA4 as input
+	GPIOA->OSPEEDR &= ~((1 << 8)); // Setting PA4 to low speed
+	GPIOA->PUPDR &= ~((1 << 8));   // Enabling Pull Down resistor for PA4
+	GPIOA->PUPDR |= ((1 << 9));
+	
+	EXTI->IMR |= (1 << 4); 
+	EXTI->FTSR &= ~(1 << 4);
+	EXTI->RTSR |= (1 << 4);
+	SYSCFG->EXTICR[0] = 0;
+	
+	
+	// Setting up rising edge interrupt for PA7
+	GPIOA->MODER &= ~((1 << 14) & (1 << 15)); // Setting PA7 as input
+	GPIOA->OSPEEDR &= ~((1 << 14)); // Setting PA7 to low speed
+	GPIOA->PUPDR &= ~((1 << 14));   // Enabling Pull Down resistor for PA7
+	GPIOA->PUPDR |= ((1 << 15));
+	
+	EXTI->IMR |= (1 << 7); 
+	EXTI->FTSR &= ~(1 << 7);
+	EXTI->RTSR |= (1 << 7);
+	/*SYSCFG->EXTICR[1] = 0;
+	SYSCFG->EXTICR[2] = 0;
+	SYSCFG->EXTICR[3] = 0;*/
+	
+	
+	
+	GPIOA->MODER &= ~((1 << 0) & (1 << 1)); // Setting PC0 as input
+	GPIOA->OSPEEDR &= ~((1 << 0)); // Setting PC0 to low speed
+	GPIOA->PUPDR &= ~((1 << 0));   // Enabling Pull Down resistor for PA0
+	GPIOA->PUPDR |= ((1 << 1));
+	
+	
+	
+	// Setting up rising edge interrupt for PA5
+	GPIOA->MODER &= ~((1 << 10) & (1 << 11)); // Setting PA5 as input
+	GPIOA->OSPEEDR &= ~((1 << 10)); // Setting PA5 to low speed
+	GPIOA->PUPDR &= ~((1 << 10));   // Enabling Pull Down resistor for PA5
+	GPIOA->PUPDR |= ((1 << 11));
+	
+	EXTI->IMR |= (1 << 5); 
+	EXTI->FTSR &= ~(1 << 5);
+	EXTI->RTSR |= (1 << 5);
+	SYSCFG->EXTICR[1] = 0;
+	SYSCFG->EXTICR[2] = 0;
+	SYSCFG->EXTICR[3] = 0;	
+	
+	
+	GPIOA->MODER &= ~((1 << 0) & (1 << 1)); // Setting PC0 as input
+	GPIOA->OSPEEDR &= ~((1 << 0)); // Setting PC0 to low speed
+	GPIOA->PUPDR &= ~((1 << 0));   // Enabling Pull Down resistor for PA0
+	GPIOA->PUPDR |= ((1 << 1));
+	
+	
+	
+	// Setting up rising edge interrupt for PA0 
+	EXTI->IMR |= (1 << 0); 
+	EXTI->FTSR &= ~(1 << 0);
+	EXTI->RTSR |= (1 << 0);
+	SYSCFG->EXTICR[0] = 0;
+	
+	//NVIC_SetPriority(EXTI0_1_IRQn, 3); // Setting priority for EXTI0 interrupt
+	//NVIC_EnableIRQ( EXTI0_1_IRQn ); // Enabling EXTI0 interrupt
+	NVIC_SetPriority(EXTI4_15_IRQn, 3); // Setting Priority For EXTI4 Interrupt
+	NVIC_EnableIRQ( EXTI4_15_IRQn ); // Enabling EXTI4 Interrupt
+}
 
-void part1(void) {
-	UART3_SendStr("I2C2 Started::\n");
-	//uint8_t receivedValue = receiveFromI2C2(0x3C, 0x1);
-	
-	transmitToI2C2(0x78, 0x1, 0xA5);
-	transmitToI2C2(0x78, 0x1, 0xA7);
-	transmitToI2C2(0x78, 0x1, 0xAF);
-	/*transmitToI2C2(0x78, 0x1, 0xA5);
-	transmitToI2C2(0x78, 0x1, 0xA5);
-	transmitToI2C2(0x78, 0x1, 0xA5);
-	transmitToI2C2(0x78, 0x1, 0xA5);
-	transmitToI2C2(0x78, 0x1, 0xA5);
-	transmitToI2C2(0x78, 0x1, 0xA5);
-	transmitToI2C2(0x78, 0x1, 0xA5);*/
-	
 
+/*Initialize Buzzer*/
+void initBuzzer(void) {	
+	GPIOB->MODER |= (1 << 4);
+	GPIOB->MODER &= ~(1 << 5);
 	
+	GPIOB->OTYPER &= ~(1 << 2);
 	
-	I2C2->CR2 |= (I2C_CR2_STOP);
-} 
+	GPIOB->OSPEEDR &= ~(1 << 4);
+	
+	GPIOB->PUPDR &= ~(1 << 5);
+	
+	GPIOB->ODR &= ~(1<<2);
+}
 
 
 void SystemClock_Config(void)
